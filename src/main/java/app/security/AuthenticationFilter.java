@@ -1,0 +1,33 @@
+package app.security;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import javax.servlet.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@Configuration
+public class AuthenticationFilter implements Filter {
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain) throws IOException, ServletException {
+        try {
+            Authentication authentication = AuthenticationService.getAuthentication((HttpServletRequest) request);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        } catch (Exception exp) {
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            httpResponse.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            PrintWriter writer = httpResponse.getWriter();
+            writer.print(exp.getMessage());
+            writer.flush();
+            writer.close();
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
