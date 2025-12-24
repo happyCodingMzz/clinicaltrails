@@ -4,10 +4,8 @@ package app.service;
 import app.dao.CentralContactDao;
 import app.dao.ClinicalTrailDao;
 import app.dao.LocationDao;
-import app.model.CentralContactModule;
-import app.model.ClinicalTrailModule;
-import app.model.ContactsLocationsModule;
-import app.model.LocationModule;
+import app.dao.RegionMetaDataDao;
+import app.model.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -15,17 +13,20 @@ import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.repository.CrudRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ReflectionUtils;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 @Service
@@ -51,7 +52,22 @@ public class LoadClinicalTrailsDataService {
     CentralContactDao centralContactDao;
 
     @Autowired
+    RegionMetaDataDao regionMetaDataDao;
+
+    @Autowired
     LocationDao locationDao;
+
+    Map<String, CrudRepository> repositoryMap;
+
+    private static final String CHINA = "中国";
+
+    @PostConstruct
+    public void init(){
+        repositoryMap = Stream.of(
+                new AbstractMap.SimpleEntry<>("ClinicalTrailModule",clinicalTrailDao ),
+                new AbstractMap.SimpleEntry<>("LocationModule", locationDao )
+        ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
 
     public List<ClinicalTrailModule> loadingLatestData(){
         log.info("Loading latest Clinical Trail data beginning");
@@ -101,8 +117,15 @@ public class LoadClinicalTrailsDataService {
         clinicalTrailDao.saveAll(addedData);
         centralContactDao.saveAll(addedCentralContacts);
         addedLocations.forEach(locationDao::save);
-        new Thread(()->doTranslation(addedData, clinicalTrailModule->
-                clinicalTrailDao.save(clinicalTrailModule))).start();
+        new Thread(()-> {
+            doTranslationForTrails(addedData, clinicalTrailModule->
+                    clinicalTrailDao.save(clinicalTrailModule));
+            doTranslationForLocations(addedLocations,
+                    (locationModule, regionMetaDataModule) -> {
+                        locationDao.save(locationModule);
+                        regionMetaDataDao.save(regionMetaDataModule);
+                    });
+        }).start();
         log.info("Refresh Clinical Trail Data successfully");
     }
 
@@ -121,38 +144,89 @@ public class LoadClinicalTrailsDataService {
         return clinicalTrailModule.getContactsLocations()!=null;
     }
 
-    private void doTranslation(List<ClinicalTrailModule> clinicalTrailModules, Consumer<ClinicalTrailModule> savingTranslatedData){
+    private void doTranslationForTrails(List<ClinicalTrailModule> clinicalTrailModules, Consumer<ClinicalTrailModule> savingTranslatedData){
         clinicalTrailModules.forEach(clinicalTrailModule ->
         {
             try {
-                Thread.sleep(1000);
-                clinicalTrailModule.setBriefSummary(translatorService.translate(clinicalTrailModule.getBriefSummary()));
-                clinicalTrailModule.setCondition(translatorService.translate(clinicalTrailModule.getCondition()));
-                clinicalTrailModule.setOfficialTitle(translatorService.translate(clinicalTrailModule.getOfficialTitle()));
-                clinicalTrailModule.setTranslated(true);
+                Thread.sleep(500);
+                String translatedSummary = translatorService.translate(clinicalTrailModule.getBriefSummary());
+                String translatedCondition = translatorService.translate(clinicalTrailModule.getCondition());
+                String translatedTitle = translatorService.translate(clinicalTrailModule.getOfficialTitle());
+                String translatedCriteria = translatorService.translate(clinicalTrailModule.getEligibilityCriteria());
+                if(!StringUtils.isEmpty(translatedSummary))
+                    clinicalTrailModule.setBriefSummary(translatedSummary);
+                if(!StringUtils.isEmpty(translatedCondition))
+                    clinicalTrailModule.setCondition(translatedCondition);
+                if(!StringUtils.isEmpty(translatedTitle))
+                    clinicalTrailModule.setOfficialTitle(translatedTitle);
+                if(!StringUtils.isEmpty(translatedCriteria))
+                    clinicalTrailModule.setEligibilityCriteria(translatedCriteria);
+
+                if(!StringUtils.isEmpty(translatedSummary) &&
+                        !StringUtils.isEmpty(translatedCondition) &&
+                        !StringUtils.isEmpty(translatedTitle) &&
+                        !StringUtils.isEmpty(translatedCriteria))
+                    clinicalTrailModule.setTranslated(true);
+
                 savingTranslatedData.accept(clinicalTrailModule);
+
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                log.error("Error happened when translating ClinicTrails ", e);
                 Thread.currentThread().interrupt();
             }
         });
         log.info("Finished translation for {} clinical trail records", clinicalTrailModules.size());
     }
 
-    public void doTranslateForField(String fieldName){
-        clinicalTrailDao.findAll().forEach(clinicalTrailModule -> {
-            if (clinicalTrailModule.isTranslated()){
-                return;
+    private void doTranslationForLocations(List<LocationModule> locationModules, BiConsumer<LocationModule, RegionMetaDataModule> savingTranslatedData){
+        locationModules.forEach(locationModule ->
+        {
+            try{
+                Thread.sleep(500);
+                String translatedCountry = translatorService.translate(locationModule.getCountry());
+                String translatedState = translatorService.translate(locationModule.getState());
+                String translatedCity = translatorService.translate(locationModule.getCity());
+                String translatedFacility = translatorService.translate(locationModule.getFacility());
+                if(!StringUtils.isEmpty(translatedCountry))
+                    locationModule.setCountry(translatedCountry);
+                if(!StringUtils.isEmpty(translatedState))
+                    locationModule.setState(translatedState);
+                if(!StringUtils.isEmpty(translatedCity))
+                    locationModule.setCity(translatedCity);
+                if(!StringUtils.isEmpty(translatedFacility))
+                    locationModule.setFacility(translatedFacility);
+
+                RegionMetaDataModule regionMetaDataModule = null;
+                if(!StringUtils.isEmpty(translatedCountry) &&
+                        !StringUtils.isEmpty(translatedState) &&
+                        !StringUtils.isEmpty(translatedCity)) {
+                    if(CHINA.equals(translatedCountry) && (regionMetaDataDao.findByCountryAndStateAndCity(translatedCountry,
+                                translatedState, translatedCity) == null)){
+                            regionMetaDataModule = new RegionMetaDataModule(UUID.randomUUID().toString(),
+                                    translatedCountry, translatedState, translatedCity);
+                    }
+                    if(!StringUtils.isEmpty(translatedFacility))
+                        locationModule.setTranslated(true);
+                }
+                savingTranslatedData.accept(locationModule, regionMetaDataModule);
             }
+            catch (InterruptedException e) {
+                log.error("Error happened when translating Locations", e);
+                Thread.currentThread().interrupt();
+            }
+        });
+    }
+
+    public void doTranslateForTable(String tableName, String fieldName){
+        repositoryMap.get(tableName).findAll().forEach(object -> {
             try {
-                Field field = clinicalTrailModule.getClass().getDeclaredField(fieldName);
+                Field field = object.getClass().getDeclaredField(fieldName);
                 ReflectionUtils.makeAccessible(field);
-                String value = (String) field.get(clinicalTrailModule);
+                String value = (String) field.get(object);
                 String translated = String.join("\n",translatorService.translate(value));
-                if(!StringUtils.isEmpty(translated)) {
-                    clinicalTrailModule.setTranslated(true);
-                    ReflectionUtils.setField(field, clinicalTrailModule, translated);
-                    clinicalTrailDao.save(clinicalTrailModule);
+                if(!StringUtils.isEmpty(translated)){
+                    ReflectionUtils.setField(field, object, translated);
+                    repositoryMap.get(tableName).save(object);
                 }
             } catch (IllegalAccessException | NoSuchFieldException e) {
                 e.printStackTrace();

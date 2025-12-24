@@ -3,6 +3,8 @@ package app.service;
 
 import com.tencentcloudapi.common.exception.TencentCloudSDKException;
 import com.tencentcloudapi.tmt.v20180321.TmtClient;
+import com.tencentcloudapi.tmt.v20180321.models.LanguageDetectRequest;
+import com.tencentcloudapi.tmt.v20180321.models.LanguageDetectResponse;
 import com.tencentcloudapi.tmt.v20180321.models.TextTranslateRequest;
 import com.tencentcloudapi.tmt.v20180321.models.TextTranslateResponse;
 import lombok.SneakyThrows;
@@ -21,7 +23,7 @@ public class TranslatorService {
     private TmtClient tmtClient;
 
     public String translate(String text) {
-        int maxRetry = 10;
+        int maxRetry = 1;
         String result;
         do {
             maxRetry--;
@@ -36,21 +38,35 @@ public class TranslatorService {
         List<String> translatedFragments = new ArrayList<>();
         try {
             for (String fragment : fragments) {
-                TextTranslateRequest textTranslateRequest = new TextTranslateRequest();
-                textTranslateRequest.setSource(from);
-                textTranslateRequest.setTarget(to);
-                textTranslateRequest.setProjectId(0L);
-                textTranslateRequest.setSourceText(fragment);
-                TextTranslateResponse response = tmtClient.TextTranslate(textTranslateRequest);
-                translatedFragments.add(response.getTargetText());
+                String detectedLanguage = detectLanguage(tmtClient, fragment);
+                if(!"en".equals(detectedLanguage)){
+                    translatedFragments.add(fragment);
+                }
+                else {
+                    TextTranslateRequest textTranslateRequest = new TextTranslateRequest();
+                    textTranslateRequest.setSource(from);
+                    textTranslateRequest.setTarget(to);
+                    textTranslateRequest.setProjectId(0L);
+                    textTranslateRequest.setSourceText(fragment);
+                    TextTranslateResponse response = tmtClient.TextTranslate(textTranslateRequest);
+                    translatedFragments.add(response.getTargetText());
+                }
+                Thread.sleep(500);
             }
         } catch (TencentCloudSDKException e) {
-            log.error("Translation failed");
+            log.error("Translation failed for text {} ", text ,e);
             return "";
         }
-        Thread.sleep(1000);
         return String.join(" ", translatedFragments);
 
+    }
+
+    private String detectLanguage(TmtClient client, String text) throws TencentCloudSDKException {
+        LanguageDetectRequest req = new LanguageDetectRequest();
+        req.setText(text); // 设置待识别文本[citation:5]
+        req.setProjectId(0L); // 使用默认项目ID[citation:5]
+        LanguageDetectResponse resp = client.LanguageDetect(req); // 调用识别接口[citation:2][citation:3][citation:5]
+        return resp.getLang(); // 返回语种代码，例如 "en"[citation:5]
     }
 
     private List<String> splitBySentences(String text) {

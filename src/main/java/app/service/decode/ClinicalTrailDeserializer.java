@@ -68,7 +68,7 @@ public class ClinicalTrailDeserializer extends StdDeserializer<ClinicalTrailModu
                         contactModules.add(new ContactModule(contactName, contactRole, contactPhone, contactPhoneExt, contactEmail));
                     });
                 }
-                locationModules.add(new LocationModule(UUID.randomUUID().toString(), nctId, facility, status, city, state, zip, country, contactModules.stream().map(contactModule ->
+                locationModules.add(new LocationModule(UUID.randomUUID().toString(), nctId, facility, status, city, state, zip, country, false, contactModules.stream().map(contactModule ->
                         (JsonNode) new ObjectMapper().valueToTree(contactModule)
                 ).collect(Collectors.toList())));
             });

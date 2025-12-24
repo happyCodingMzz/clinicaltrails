@@ -1,6 +1,7 @@
 package app.gateway;
 
 import app.model.ClinicalTrailVO;
+import app.model.RegionMetaDataModule;
 import app.service.QueryClinicalTrailsService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,16 @@ public class ClinicTrailsQueryController {
     @GetMapping("/all")
     public List<ClinicalTrailVO> queryAll(){
         return queryClinicalTrailsService.getAllTrails();
+    }
+
+    @GetMapping("/findByCountry")
+    public List<ClinicalTrailVO> queryByCountry(@RequestParam String country ){
+        return queryClinicalTrailsService.getByCountry(country);
+    }
+
+    @GetMapping("/findRegions")
+    public List<RegionMetaDataModule> queryRegions(){
+        return queryClinicalTrailsService.getRegions();
     }
 
 }

@@ -21,8 +21,8 @@ public class DataManagementController {
     private LoadClinicalTrailsDataService loadClinicalTrailsDataService;
 
     @PostMapping("/translation")
-    public void fieldTranslate(@Parameter String field){
-        loadClinicalTrailsDataService.doTranslateForField(field);
+    public void fieldTranslate(@Parameter String tableName, @Parameter String field){
+        loadClinicalTrailsDataService.doTranslateForTable(tableName,field);
     }
 
 

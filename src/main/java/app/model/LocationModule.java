@@ -31,6 +31,8 @@ public class LocationModule {
 
     String country;
 
+    boolean isTranslated;
+
 
     @Column(name = "contacts", columnDefinition = "json")
     @Convert(converter = JsonNodeListConverter.class)

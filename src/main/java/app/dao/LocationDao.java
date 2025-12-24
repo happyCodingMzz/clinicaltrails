@@ -18,4 +18,6 @@ public interface LocationDao extends CrudRepository<LocationModule, String> {
     void deleteAllByNctIdIn(@Param("ntcs")List<String> ntcIds);
 
     List<LocationModule> findByNctId(String nctId);
+
+    List<LocationModule> findByCountry(String country);
 }
