@@ -20,4 +20,8 @@ public interface LocationDao extends CrudRepository<LocationModule, String> {
     List<LocationModule> findByNctId(String nctId);
 
     List<LocationModule> findByCountry(String country);
+
+    List<LocationModule> findByCountryAndState(String country, String state);
+
+    List<LocationModule> findByCountryAndStateAndCity(String country, String state, String city);
 }

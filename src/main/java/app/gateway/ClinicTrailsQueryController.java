@@ -37,4 +37,19 @@ public class ClinicTrailsQueryController {
         return queryClinicalTrailsService.getRegions();
     }
 
+    @GetMapping("/findByCountryAndState")
+    public List<ClinicalTrailVO> queryByCountryAndState(@RequestParam String country, @RequestParam String state){
+        return queryClinicalTrailsService.getByCountryAndState(country, state);
+    }
+
+    @GetMapping("/findByCountryAndStateAndCity")
+    public List<ClinicalTrailVO> queryByCountryAndStateAndCity(@RequestParam String country, @RequestParam String state, @RequestParam String city) {
+        return queryClinicalTrailsService.getByCountryAndStateAndCity(country, state, city);
+    }
+
+    @GetMapping("/findByIdOrName")
+    public List<ClinicalTrailVO> queryByIdOrName(@RequestParam String searchText){
+        return queryClinicalTrailsService.getByIdOrName(searchText);
+    }
+
 }

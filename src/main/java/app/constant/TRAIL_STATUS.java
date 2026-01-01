@@ -1,0 +1,14 @@
+package app.constant;
+
+
+public enum TRAIL_STATUS {
+
+    NOT_YET_RECRUITING,
+    RECRUITING,
+    ACTIVE_NOT_RECRUITING,
+    SUSPENDED,
+    COMPLETED,
+    TERMINATED,
+    WITHDRAWN;
+
+}
