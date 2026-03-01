@@ -14,10 +14,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
 public class TranslatorService {
+
+    private final Map<String, String> special = Stream.of(
+            new AbstractMap.SimpleEntry<>("北京市","北京"),
+            new AbstractMap.SimpleEntry<>("上海市","上海"),
+            new AbstractMap.SimpleEntry<>("天津市","天津"),
+            new AbstractMap.SimpleEntry<>("重庆市","重庆")
+    ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     @Autowired
     private TmtClient tmtClient;
@@ -49,7 +58,9 @@ public class TranslatorService {
                     textTranslateRequest.setProjectId(0L);
                     textTranslateRequest.setSourceText(fragment);
                     TextTranslateResponse response = tmtClient.TextTranslate(textTranslateRequest);
-                    translatedFragments.add(response.getTargetText());
+                    String translatedValue = special.containsKey(response.getTargetText())?
+                            special.get(response.getTargetText()) : response.getTargetText();
+                    translatedFragments.add(translatedValue);
                 }
                 Thread.sleep(500);
             }
@@ -61,12 +72,18 @@ public class TranslatorService {
 
     }
 
-    private String detectLanguage(TmtClient client, String text) throws TencentCloudSDKException {
-        LanguageDetectRequest req = new LanguageDetectRequest();
-        req.setText(text); // 设置待识别文本[citation:5]
-        req.setProjectId(0L); // 使用默认项目ID[citation:5]
-        LanguageDetectResponse resp = client.LanguageDetect(req); // 调用识别接口[citation:2][citation:3][citation:5]
-        return resp.getLang(); // 返回语种代码，例如 "en"[citation:5]
+    private String detectLanguage(TmtClient client, String text) {
+        try {
+            LanguageDetectRequest req = new LanguageDetectRequest();
+            req.setText(text); // 设置待识别文本[citation:5]
+            req.setProjectId(0L); // 使用默认项目ID[citation:5]
+            LanguageDetectResponse resp = client.LanguageDetect(req); // 调用识别接口[citation:2][citation:3][citation:5]
+            return resp.getLang(); // 返回语种代码，例如 "en"[citation:5]
+        }
+       catch (TencentCloudSDKException e) {
+            log.error("无法识别该文字 {}", text);
+            return "";
+        }
     }
 
     private List<String> splitBySentences(String text) {

@@ -122,8 +122,8 @@ public class LoadClinicalTrailsDataService {
                     clinicalTrailDao.save(clinicalTrailModule));
             doTranslationForLocations(addedLocations,
                     (locationModule, regionMetaDataModule) -> {
-                        locationDao.save(locationModule);
-                        regionMetaDataDao.save(regionMetaDataModule);
+                        if(locationModule!=null) locationDao.save(locationModule);
+                        if(regionMetaDataModule!=null) regionMetaDataDao.save(regionMetaDataModule);
                     });
         }).start();
         log.info("Refresh Clinical Trail Data successfully");
@@ -217,19 +217,26 @@ public class LoadClinicalTrailsDataService {
         });
     }
 
-    public void doTranslateForTable(String tableName, String fieldName){
+    public void doTranslateForTable(String tableName, String fieldName, String filterFieldName, String filterValue){
         repositoryMap.get(tableName).findAll().forEach(object -> {
             try {
+                if(!StringUtils.isEmpty(filterFieldName)){
+                    Field filterField = object.getClass().getDeclaredField(filterFieldName);
+                    ReflectionUtils.makeAccessible(filterField);
+                    String filterTarget = (String) filterField.get(object);
+                    if(!filterValue.equals(filterTarget)) return;
+                }
                 Field field = object.getClass().getDeclaredField(fieldName);
                 ReflectionUtils.makeAccessible(field);
                 String value = (String) field.get(object);
                 String translated = String.join("\n",translatorService.translate(value));
                 if(!StringUtils.isEmpty(translated)){
+                    log.info("翻译成功 {} -> {}", value, translated);
                     ReflectionUtils.setField(field, object, translated);
                     repositoryMap.get(tableName).save(object);
                 }
             } catch (IllegalAccessException | NoSuchFieldException e) {
-                e.printStackTrace();
+                log.error("{} 数据表中的 {} 字段翻译失败",tableName, fieldName, e);
             }
         });
     }
